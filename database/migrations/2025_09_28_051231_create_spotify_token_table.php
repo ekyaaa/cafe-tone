@@ -11,13 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('t_music_token', function (Blueprint $table) {
-            $table->id('music_token_id');
-            $table->string('token', 255);
-            $table->integer('request_available')->default(2);
-            $table->dateTime('last_requested_at')->nullable();
-            $table->dateTime('expired_at')->default(now()->addHour(24));
+        Schema::create('t_spotify_token', function (Blueprint $table) {
+            $table->id('spotify_token_id');
+            $table->text('access_token');
+            $table->text('refresh_token');
+            $table->dateTime('expired_at');
             $table->timestamps();
+
+            $table->foreignId('user_id')->constrained('m_user', 'user_id');
         });
     }
 
@@ -26,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('t_music_token');
+        Schema::dropIfExists('t_spotify_token');
     }
 };
