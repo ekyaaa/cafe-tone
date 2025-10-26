@@ -230,7 +230,7 @@ class SpotifyService
     /**
      * Play a track/playlist
      */
-    public function play($accessToken, $deviceId = null, $contextUri = null, $uris = null, $positionMs = 0)
+    public function play($accessToken, $deviceId = null, $contextUri = null, $uris = null, $positionMs = 0, $offset = null)
     {
         try {
             $body = [];
@@ -240,11 +240,15 @@ class SpotifyService
             }
 
             if ($uris) {
-                $body['uris'] = $uris;
+                $body['uris'] = is_array($uris) ? $uris : [$uris];
             }
 
             if ($positionMs > 0) {
                 $body['position_ms'] = $positionMs;
+            }
+
+            if ($offset) {
+                $body['offset'] = $offset;
             }
 
             $query = $deviceId ? ['device_id' => $deviceId] : [];
@@ -255,13 +259,14 @@ class SpotifyService
                     'Content-Type' => 'application/json',
                 ],
                 'query' => $query,
-                'json' => $body,
+                'json' => !empty($body) ? $body : null,
             ]);
 
             return $response->getStatusCode() === 204;
         } catch (GuzzleException $e) {
             Log::error('Error playing track', [
                 'message' => $e->getMessage(),
+                'code' => $e->getCode(),
             ]);
             throw $e;
         }
@@ -461,6 +466,30 @@ class SpotifyService
             return $response->getStatusCode() === 204;
         } catch (GuzzleException $e) {
             Log::error('Error transferring playback', [
+                'message' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get user's recently played tracks
+     */
+    public function getRecentlyPlayed($accessToken, $limit = 20)
+    {
+        try {
+            $response = $this->client->get('me/player/recently-played', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                ],
+                'query' => [
+                    'limit' => $limit,
+                ],
+            ]);
+
+            return json_decode($response->getBody(), true);
+        } catch (GuzzleException $e) {
+            Log::error('Error getting recently played', [
                 'message' => $e->getMessage(),
             ]);
             throw $e;
