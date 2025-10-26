@@ -21,12 +21,32 @@ class UserSeeder extends Seeder
             DB::table('m_user')->insert([
                 'user_name' => $faker->name(),
                 'email' => $faker->unique()->safeEmail(),
-                'password' => Hash::make('password123'), 
+                'password' => Hash::make('password123'),
                 'id_role' => 1,
                 'remember_token' => Str::random(10),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
         }
+        
+        // For user
+        DB::table('m_user')->insert([
+            'user_name' => $faker->name(),
+            'email' => $faker->unique()->safeEmail(),
+            'password' => Hash::make('password123'),
+            'id_role' => 2,
+            'remember_token' => Str::random(10),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('m_user')->insert([
+            'user_name' => $faker->name(),
+            'email' => $faker->unique()->safeEmail(),
+            'password' => Hash::make('password123'),
+            'id_role' => 3,
+            'remember_token' => Str::random(10),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

@@ -15,9 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
-
-        //
+        
+        // Register middleware alias
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\IsAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        //c1    
     })->create();
