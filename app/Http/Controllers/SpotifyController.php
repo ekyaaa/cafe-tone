@@ -271,22 +271,133 @@ class SpotifyController extends Controller
      */
     public function play(Request $request)
     {
-        return $this->controlPlayback('play', $request);
+        $user = Auth::user();
+
+        if ($user->id_role !== 1) {
+            return response()->json(['error' => 'Only admins can control playback'], 403);
+        }
+
+        $accessToken = $this->getValidAccessToken($user);
+
+        if (!$accessToken) {
+            return response()->json(['error' => 'Not connected to Spotify'], 401);
+        }
+
+        try {
+            $deviceId = $request->input('device_id');
+            $uris = $request->input('uris');
+            $contextUri = $request->input('context_uri');
+            $offset = $request->input('offset');
+            $positionMs = $request->input('position_ms', 0);
+
+            $result = $this->spotify->play(
+                $accessToken,
+                $deviceId,
+                $contextUri,
+                $uris,
+                $positionMs,
+                $offset
+            );
+
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Error playing', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'error' => 'Playback control failed',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
+    /**
+     * Pause playback
+     */
     public function pause(Request $request)
     {
-        return $this->controlPlayback('pause', $request);
+        $user = Auth::user();
+
+        if ($user->id_role !== 1) {
+            return response()->json(['error' => 'Only admins can control playback'], 403);
+        }
+
+        $accessToken = $this->getValidAccessToken($user);
+
+        if (!$accessToken) {
+            return response()->json(['error' => 'Not connected to Spotify'], 401);
+        }
+
+        try {
+            $deviceId = $request->input('device_id');
+            $result = $this->spotify->pause($accessToken, $deviceId);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Error pausing', [
+                'message' => $e->getMessage(),
+            ]);
+            return response()->json(['error' => 'Playback control failed'], 500);
+        }
     }
 
+    /**
+     * Next track
+     */
     public function next(Request $request)
     {
-        return $this->controlPlayback('next', $request);
+        $user = Auth::user();
+
+        if ($user->id_role !== 1) {
+            return response()->json(['error' => 'Only admins can control playback'], 403);
+        }
+
+        $accessToken = $this->getValidAccessToken($user);
+
+        if (!$accessToken) {
+            return response()->json(['error' => 'Not connected to Spotify'], 401);
+        }
+
+        try {
+            $deviceId = $request->input('device_id');
+            $result = $this->spotify->next($accessToken, $deviceId);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Error next track', [
+                'message' => $e->getMessage(),
+            ]);
+            return response()->json(['error' => 'Playback control failed'], 500);
+        }
     }
 
+    /**
+     * Previous track
+     */
     public function previous(Request $request)
     {
-        return $this->controlPlayback('previous', $request);
+        $user = Auth::user();
+
+        if ($user->id_role !== 1) {
+            return response()->json(['error' => 'Only admins can control playback'], 403);
+        }
+
+        $accessToken = $this->getValidAccessToken($user);
+
+        if (!$accessToken) {
+            return response()->json(['error' => 'Not connected to Spotify'], 401);
+        }
+
+        try {
+            $deviceId = $request->input('device_id');
+            $result = $this->spotify->previous($accessToken, $deviceId);
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Error previous track', [
+                'message' => $e->getMessage(),
+            ]);
+            return response()->json(['error' => 'Playback control failed'], 500);
+        }
     }
 
     private function controlPlayback($action, Request $request)
@@ -366,5 +477,41 @@ class SpotifyController extends Controller
         }
 
         return $adminToken->access_token;
+    }
+
+    /**
+     * Get recently played tracks
+     */
+    public function getRecentlyPlayed(Request $request)
+    {
+        try {
+            // Find admin's token (first admin with token)
+            $adminToken = SpotifyTokenModel::join('m_user', 't_spotify_token.user_id', '=', 'm_user.user_id')
+                ->where('m_user.id_role', 1)
+                ->select('t_spotify_token.*')
+                ->first();
+
+            if (!$adminToken) {
+                return response()->json(['error' => 'No admin connected to Spotify'], 404);
+            }
+
+            $accessToken = $this->getValidAccessTokenForAdmin($adminToken);
+
+            if (!$accessToken) {
+                return response()->json(['error' => 'Failed to get valid token'], 401);
+            }
+
+            // Get recently played from Spotify API
+            $response = $this->spotify->getRecentlyPlayed($accessToken, 1); // Get last 1 track
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting recently played', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'Failed to get recently played'], 500);
+        }
     }
 }

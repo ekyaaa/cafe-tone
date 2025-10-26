@@ -16,7 +16,7 @@ use Inertia\Inertia;
 Route::middleware(['guest'])->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])
         ->name('login');
-    
+
     Route::post('/login', [LoginController::class, 'login'])
         ->name('login.submit');
 });
@@ -44,7 +44,8 @@ Route::middleware(['auth'])->prefix('api/spotify')->group(function () {
     // Public (all users can see status)
     Route::get('/check-connection', [SpotifyController::class, 'checkConnection']);
     Route::get('/current-playback', [SpotifyController::class, 'getCurrentPlayback']);
-    
+    Route::get('/recently-played', [SpotifyController::class, 'getRecentlyPlayed']); // ← NEW
+
     // Admin only (control)
     Route::get('/token', [SpotifyController::class, 'getToken']);
     Route::post('/play', [SpotifyController::class, 'play']);
@@ -85,7 +86,7 @@ Route::prefix('user')
 Route::get('/', function () {
     if (Auth::check()) {
         $user = Auth::user();
-        
+
         // Redirect based on role
         if ($user->id_role === 1) {
             return redirect()->route('admin.home');
@@ -93,6 +94,25 @@ Route::get('/', function () {
             return redirect()->route('user.home');
         }
     }
-    
+
     return redirect()->route('login');
 })->name('home');
+
+// ========================================
+// API ROUTES (Spotify)
+// ========================================
+Route::middleware('auth')->group(function () {
+    Route::prefix('spotify')->group(function () {
+        // Connection & Info
+        Route::get('/check-connection', [SpotifyController::class, 'checkConnection']);
+        Route::get('/token', [SpotifyController::class, 'getToken']);
+        Route::get('/current-playback', [SpotifyController::class, 'getCurrentPlayback']);
+        Route::get('/recently-played', [SpotifyController::class, 'getRecentlyPlayed']);
+        
+        // Playback Control (Admin only)
+        Route::post('/play', [SpotifyController::class, 'play']);
+        Route::post('/pause', [SpotifyController::class, 'pause']);
+        Route::post('/next', [SpotifyController::class, 'next']);
+        Route::post('/previous', [SpotifyController::class, 'previous']);
+    });
+});
