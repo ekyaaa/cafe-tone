@@ -1,26 +1,24 @@
 import '../css/app.css';
 import './bootstrap';
 
+import { createRoot } from 'react-dom/client';
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { createRoot, hydrateRoot } from 'react-dom/client';
+import { SpotifyProvider } from './Contexts/SpotifyContext';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
-    resolve: (name) =>
-        resolvePageComponent(
-            `./Pages/${name}.jsx`,
-            import.meta.glob('./Pages/**/*.jsx'),
-        ),
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
     setup({ el, App, props }) {
-        if (import.meta.env.SSR) {
-            hydrateRoot(el, <App {...props} />);
-            return;
-        }
+        const root = createRoot(el);
 
-        createRoot(el).render(<App {...props} />);
+        root.render(
+            <SpotifyProvider>
+                <App {...props} />
+            </SpotifyProvider>
+        );
     },
     progress: {
         color: '#4B5563',

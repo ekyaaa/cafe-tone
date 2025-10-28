@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SpotifyController;
+use App\Http\Controllers\Admin\AdminHomeController;
 use App\Http\Controllers\Admin\AdminPageController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\User\UserController;
@@ -61,7 +62,7 @@ Route::prefix('admin')
     ->middleware(['auth', 'admin'])
     ->name('admin.')
     ->group(function () {
-        Route::get('/', [AdminPageController::class, 'index'])->name('home');
+        Route::get('/', [AdminHomeController::class, 'index'])->name('home');
         Route::get('/explore', [AdminPageController::class, 'explore'])->name('explore');
         Route::get('/library', [AdminPageController::class, 'library'])->name('library');
         Route::get('/playlist/{id}', [AdminPageController::class, 'playlist'])->name('playlist');
