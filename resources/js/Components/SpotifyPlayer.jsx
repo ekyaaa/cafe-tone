@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useSpotifyConnection } from '@/Contexts/SpotifyContext';
 import MiniPlayer from './SpotifyPlayerComponents/MiniPlayer';
 import ExpandedPlayer from './SpotifyPlayerComponents/ExpandedPlayer';
 import LoadingState from './SpotifyPlayerComponents/LoadingState';
@@ -22,23 +23,34 @@ export default function SpotifyPlayer() {
     // Player States
     const [player, setPlayer] = useState(null);
     const [deviceId, setDeviceId] = useState(null);
-    
-    // Connection States (from backend)
-    const [isConnected, setIsConnected] = useState(false);
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [canControl, setCanControl] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [user, setUser] = useState(null);
     
-    const progressIntervalRef = useRef(null); // NEW: For progress streaming
+    // ✅ Get connection status from Context (shared with HomeAdmin)
+    const { isConnected, isAdmin, canControl, user, refreshConnection } = useSpotifyConnection();
+    
+    const progressIntervalRef = useRef(null);
     const pollIntervalRef = useRef(null);
-    const lastProgressUpdateRef = useRef(0); // NEW: Track last progress update time
+    const lastProgressUpdateRef = useRef(0);
 
     // ========================================
-    // Lifecycle: Check Connection on Mount
+    // Lifecycle: Initialize Based on Connection Status
     // ========================================
     useEffect(() => {
-        checkConnection();
+        console.log('🔄 [Player] Connection status changed:', { isConnected, canControl });
+
+        if (canControl) {
+            console.log('🎛️ [Player] Initializing player (Admin with token)');
+            fetchLastPlayback();
+            initializePlayer();
+        } else if (isConnected) {
+            console.log('👁️ [Player] Starting polling (Viewer mode)');
+            fetchLastPlayback();
+            startPolling();
+            setIsLoading(false);
+        } else {
+            console.log('⚠️ [Player] No Spotify connection');
+            setIsLoading(false);
+        }
         
         return () => {
             if (pollIntervalRef.current) {
@@ -51,27 +63,23 @@ export default function SpotifyPlayer() {
                 player.disconnect();
             }
         };
-    }, []);
+    }, [isConnected, canControl]); // ✅ Re-run when connection status changes
 
     // ========================================
-    // NEW: Progress Streaming Effect
+    // Progress Streaming Effect
     // ========================================
     useEffect(() => {
-        // Clear existing interval
         if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current);
         }
 
-        // Only stream progress when playing
         if (isPlaying && duration > 0) {
             console.log('▶️ Starting progress stream');
             
-            // Update progress every 100ms for smooth animation
             progressIntervalRef.current = setInterval(() => {
                 setProgress(prev => {
-                    const newProgress = prev + 100; // Increment by 100ms
+                    const newProgress = prev + 100;
                     
-                    // Don't exceed duration
                     if (newProgress >= duration) {
                         clearInterval(progressIntervalRef.current);
                         return duration;
@@ -84,7 +92,6 @@ export default function SpotifyPlayer() {
             console.log('⏸️ Stopping progress stream');
         }
 
-        // Cleanup on unmount or when dependencies change
         return () => {
             if (progressIntervalRef.current) {
                 clearInterval(progressIntervalRef.current);
@@ -93,51 +100,7 @@ export default function SpotifyPlayer() {
     }, [isPlaying, duration]);
 
     // ========================================
-    // API: Check Connection Status
-    // ========================================
-    const checkConnection = async () => {
-        try {
-            console.log('🔍 Checking Spotify connection...');
-            
-            const { data } = await axios.get('/api/spotify/check-connection');
-            
-            console.log('✅ Backend response:', data);
-            
-            setIsAdmin(data.is_admin);
-            setCanControl(data.can_control);
-            setIsConnected(data.is_connected);
-            setUser(data.user);
-
-            console.log('👤 User Info:', {
-                name: data.user.name,
-                role: data.user.role,
-                is_admin: data.is_admin,
-                can_control: data.can_control,
-            });
-
-            if (data.can_control) {
-                console.log('🎛️ Initializing player (Admin with token)');
-                // Fetch last playback BEFORE initializing player
-                await fetchLastPlayback();
-                initializePlayer();
-            } else if (data.is_connected) {
-                console.log('👁️ Starting polling (Viewer mode)');
-                // Fetch last playback for viewers too
-                await fetchLastPlayback();
-                startPolling();
-                setIsLoading(false);
-            } else {
-                console.log('⚠️ No Spotify connection');
-                setIsLoading(false);
-            }
-        } catch (error) {
-            console.error('❌ Error checking connection:', error);
-            setIsLoading(false);
-        }
-    };
-
-    // ========================================
-    // NEW: Fetch Last Playback on Connect
+    // Fetch Last Playback on Connect
     // ========================================
     const fetchLastPlayback = async () => {
         try {
@@ -158,20 +121,14 @@ export default function SpotifyPlayer() {
                 setDuration(data.item.duration_ms);
             } else {
                 console.log('⚠️ No recent playback found');
-                
-                // If no current playback, try to get recently played
                 await fetchRecentlyPlayed();
             }
         } catch (error) {
             console.log('⚠️ No active playback, trying recently played...');
-            // Fallback to recently played
             await fetchRecentlyPlayed();
         }
     };
 
-    // ========================================
-    // NEW: Fetch Recently Played Tracks
-    // ========================================
     const fetchRecentlyPlayed = async () => {
         try {
             console.log('🎵 Fetching recently played...');
@@ -181,7 +138,7 @@ export default function SpotifyPlayer() {
                 const lastTrack = data.items[0].track;
                 console.log('✅ Recently played found:', lastTrack.name);
                 
-                setIsPlaying(false); // Not currently playing
+                setIsPlaying(false);
                 setCurrentTrack({
                     title: lastTrack.name,
                     artist: lastTrack.artists.map(a => a.name).join(', '),
@@ -229,8 +186,8 @@ export default function SpotifyPlayer() {
 
                 spotifyPlayer.addListener('authentication_error', ({ message }) => {
                     console.error('❌ Authentication Error:', message);
-                    setIsConnected(false);
-                    setCanControl(false);
+                    // ✅ Refresh connection status on auth error
+                    refreshConnection();
                 });
 
                 spotifyPlayer.addListener('account_error', ({ message }) => {
@@ -243,6 +200,8 @@ export default function SpotifyPlayer() {
                     console.log('✅ Player Ready! Device ID:', device_id);
                     setDeviceId(device_id);
                     setIsLoading(false);
+                    // ✅ Refresh connection status when player is ready
+                    refreshConnection();
                 });
 
                 spotifyPlayer.addListener('not_ready', ({ device_id }) => {
@@ -251,22 +210,9 @@ export default function SpotifyPlayer() {
 
                 // State Change Listener
                 spotifyPlayer.addListener('player_state_changed', (state) => {
-                    if (!state) {
-                        console.warn('⚠️ Player state is null');
-                        return;
-                    }
+                    if (!state) return;
 
-                    console.log('🎵 Player state changed:', {
-                        playing: !state.paused,
-                        track: state.track_window.current_track.name,
-                        position: state.position,
-                    });
-
-                    const newIsPlaying = !state.paused;
-                    const newProgress = state.position;
-                    const newDuration = state.duration;
-
-                    setIsPlaying(newIsPlaying);
+                    setIsPlaying(!state.paused);
                     setCurrentTrack({
                         title: state.track_window.current_track.name,
                         artist: state.track_window.current_track.artists.map(a => a.name).join(', '),
@@ -274,11 +220,9 @@ export default function SpotifyPlayer() {
                         thumbnail: state.track_window.current_track.album.images[0]?.url,
                     });
                     
-                    // Sync progress from SDK state (this is the source of truth)
-                    setProgress(newProgress);
-                    setDuration(newDuration);
+                    setProgress(state.position);
+                    setDuration(state.duration);
                     
-                    // Store last update time
                     lastProgressUpdateRef.current = Date.now();
                 });
 
@@ -296,7 +240,6 @@ export default function SpotifyPlayer() {
 
         } catch (error) {
             console.error('❌ Error initializing player:', error);
-            console.error('Error details:', error.response?.data);
             setIsLoading(false);
         }
     };
@@ -310,11 +253,7 @@ export default function SpotifyPlayer() {
                 const { data } = await axios.get('/api/spotify/current-playback');
                 
                 if (data && data.item) {
-                    const newIsPlaying = data.is_playing;
-                    const newProgress = data.progress_ms;
-                    const newDuration = data.item.duration_ms;
-                    
-                    setIsPlaying(newIsPlaying);
+                    setIsPlaying(data.is_playing);
                     setCurrentTrack({
                         title: data.item.name,
                         artist: data.item.artists.map(a => a.name).join(', '),
@@ -322,9 +261,8 @@ export default function SpotifyPlayer() {
                         thumbnail: data.item.album.images[0]?.url,
                     });
                     
-                    // Sync progress from API
-                    setProgress(newProgress);
-                    setDuration(newDuration);
+                    setProgress(data.progress_ms);
+                    setDuration(data.item.duration_ms);
                     
                     lastProgressUpdateRef.current = Date.now();
                 }
@@ -334,7 +272,7 @@ export default function SpotifyPlayer() {
         };
 
         poll();
-        pollIntervalRef.current = setInterval(poll, 1000); // Poll every 1 second for viewers
+        pollIntervalRef.current = setInterval(poll, 1000);
     };
 
     // ========================================
@@ -347,21 +285,13 @@ export default function SpotifyPlayer() {
         }
 
         try {
-            console.log('🎵 Toggling play/pause');
-            
-            // Get current state first
             const state = await player.getCurrentState();
             
             if (!state) {
-                console.warn('⚠️ No playback state - need to start playback first');
-                
-                // If no state, we need to start playback with a track/playlist
-                // Try to resume last playback
                 await resumePlayback();
                 return;
             }
 
-            // If there's a state, just toggle
             await player.togglePlay();
             
         } catch (error) {
@@ -369,48 +299,29 @@ export default function SpotifyPlayer() {
         }
     };
 
-    // ========================================
-    // NEW: Resume Playback via Backend API
-    // ========================================
     const resumePlayback = async () => {
         try {
-            console.log('▶️ Resuming playback via backend...');
-            
-            // Call backend API instead of Spotify directly
             await axios.post('/api/spotify/play', {
                 device_id: deviceId
             });
             
-            console.log('✅ Playback resumed');
-            
         } catch (error) {
             console.error('❌ Error resuming playback:', error);
             
-            // If resume fails, try to play recently played
             if (error.response?.status === 404 || error.response?.status === 500) {
-                console.warn('⚠️ No active playback context, trying to play recently played...');
                 await playRecentlyPlayed();
             }
         }
     };
 
-    // ========================================
-    // NEW: Play Recently Played Track
-    // ========================================
     const playRecentlyPlayed = async () => {
         try {
-            console.log('🎵 Playing recently played track...');
-            
             const { data: recentData } = await axios.get('/api/spotify/recently-played');
             
             if (recentData && recentData.items && recentData.items.length > 0) {
                 const lastTrack = recentData.items[0].track;
-                
-                console.log('▶️ Playing:', lastTrack.name);
-                
                 await playTrack(lastTrack.uri);
             } else {
-                console.warn('⚠️ No recently played tracks found');
                 alert('No playback history found. Please start playing from Spotify app first.');
             }
             
@@ -421,21 +332,13 @@ export default function SpotifyPlayer() {
     };
 
     const playTrack = async (uri) => {
-        if (!canControl || !player || !deviceId) {
-            console.warn('⚠️ Cannot play track: missing requirements');
-            return;
-        }
+        if (!canControl || !player || !deviceId) return;
         
         try {
-            console.log('▶️ Playing track via backend:', uri);
-            
-            // Use backend API
             await axios.post('/api/spotify/play', {
                 device_id: deviceId,
                 uris: [uri]
             });
-            
-            console.log('✅ Track started playing');
             
         } catch (error) {
             console.error('❌ Error playing track:', error);
@@ -451,46 +354,26 @@ export default function SpotifyPlayer() {
     };
 
     const handleNext = async () => {
-        if (!canControl || !player) {
-            console.warn('⚠️ Cannot control next');
-            return;
-        }
+        if (!canControl || !player) return;
         
         try {
-            console.log('⏭️ Next track');
-            
             const state = await player.getCurrentState();
-            
-            if (!state) {
-                console.warn('⚠️ No playback state');
-                return;
-            }
+            if (!state) return;
             
             await player.nextTrack();
-            
         } catch (error) {
             console.error('❌ Error next track:', error);
         }
     };
 
     const handlePrevious = async () => {
-        if (!canControl || !player) {
-            console.warn('⚠️ Cannot control previous');
-            return;
-        }
+        if (!canControl || !player) return;
         
         try {
-            console.log('⏮️ Previous track');
-            
             const state = await player.getCurrentState();
-            
-            if (!state) {
-                console.warn('⚠️ No playback state');
-                return;
-            }
+            if (!state) return;
             
             await player.previousTrack();
-            
         } catch (error) {
             console.error('❌ Error previous track:', error);
         }
@@ -500,16 +383,9 @@ export default function SpotifyPlayer() {
         if (!canControl || !player) return;
         
         try {
-            // Immediately update UI for responsiveness
             setProgress(newProgress);
-            
-            // Then send to Spotify
             await player.seek(newProgress);
-            
-            // Update last progress time
             lastProgressUpdateRef.current = Date.now();
-            
-            console.log('⏩ Seeked to:', formatTime(newProgress));
         } catch (error) {
             console.error('❌ Error seeking:', error);
         }
@@ -540,9 +416,6 @@ export default function SpotifyPlayer() {
         }
     };
 
-    // ========================================
-    // Utils
-    // ========================================
     const formatTime = (ms) => {
         const totalSeconds = Math.floor(ms / 1000);
         const minutes = Math.floor(totalSeconds / 60);

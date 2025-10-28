@@ -1,5 +1,5 @@
 <?php
-// filepath: app/Services/SpotifyService.php
+// filepath: e:\Project\cafe-tone\app\Services\SpotifyService.php
 
 namespace App\Services;
 
@@ -17,9 +17,9 @@ class SpotifyService
     public function __construct()
     {
         $this->client = new Client(['base_uri' => 'https://api.spotify.com/v1/']);
-        $this->clientId = config('services.spotify.client_id');
-        $this->clientSecret = config('services.spotify.client_secret');
-        $this->redirectUri = config('services.spotify.redirect_uri');
+        $this->clientId = env('SPOTIFY_CLIENT_ID');
+        $this->clientSecret = env('SPOTIFY_CLIENT_SECRET');
+        $this->redirectUri = env('SPOTIFY_REDIRECT_URI');
     }
 
     /**
@@ -177,11 +177,16 @@ class SpotifyService
     }
 
     /**
-     * Get playlist tracks
+     * Get Playlist Tracks
      */
     public function getPlaylistTracks($accessToken, $playlistId, $limit = 100, $offset = 0)
     {
         try {
+            Log::info('🎵 Fetching playlist tracks', [
+                'playlist_id' => $playlistId,
+                'limit' => $limit,
+            ]);
+
             $response = $this->client->get("playlists/{$playlistId}/tracks", [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $accessToken,
@@ -189,20 +194,30 @@ class SpotifyService
                 'query' => [
                     'limit' => $limit,
                     'offset' => $offset,
+                    'fields' => 'items(track(id,name,artists(name),album(name,images),duration_ms,uri))',
                 ],
             ]);
 
-            return json_decode($response->getBody(), true);
-        } catch (GuzzleException $e) {
-            Log::error('Error getting playlist tracks', [
-                'message' => $e->getMessage(),
+            $data = json_decode($response->getBody()->getContents(), true);
+            
+            Log::info('✅ Playlist tracks fetched', [
+                'count' => count($data['items'] ?? [])
             ]);
-            throw $e;
+
+            return $data;
+
+        } catch (GuzzleException $e) {
+            Log::error('❌ Error fetching playlist tracks', [
+                'error' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'playlist_id' => $playlistId,
+            ]);
+            return ['items' => []];
         }
     }
 
     /**
-     * Search for tracks, artists, albums, playlists
+     * Search Spotify (for playlists, tracks, albums, etc.)
      */
     public function search($accessToken, $query, $type = 'track', $limit = 20)
     {
@@ -213,17 +228,18 @@ class SpotifyService
                 ],
                 'query' => [
                     'q' => $query,
-                    'type' => $type,
+                    'type' => $type, // track, album, artist, playlist
                     'limit' => $limit,
                 ],
             ]);
 
-            return json_decode($response->getBody(), true);
+            return json_decode($response->getBody()->getContents(), true);
         } catch (GuzzleException $e) {
             Log::error('Error searching Spotify', [
-                'message' => $e->getMessage(),
+                'error' => $e->getMessage(),
+                'query' => $query,
             ]);
-            throw $e;
+            return [];
         }
     }
 
@@ -403,7 +419,7 @@ class SpotifyService
     /**
      * Get user's top tracks
      */
-    public function getTopTracks($accessToken, $timeRange = 'medium_term', $limit = 20)
+    public function getTopTracks($accessToken, $timeRange = 'short_term', $limit = 20)
     {
         try {
             $response = $this->client->get('me/top/tracks', [
@@ -416,12 +432,13 @@ class SpotifyService
                 ],
             ]);
 
-            return json_decode($response->getBody(), true);
+            return json_decode($response->getBody()->getContents(), true);
         } catch (GuzzleException $e) {
-            Log::error('Error getting top tracks', [
-                'message' => $e->getMessage(),
+            Log::error('Error fetching top tracks', [
+                'error' => $e->getMessage(),
+                'code' => $e->getCode()
             ]);
-            throw $e;
+            return ['items' => []];
         }
     }
 
@@ -487,12 +504,13 @@ class SpotifyService
                 ],
             ]);
 
-            return json_decode($response->getBody(), true);
+            return json_decode($response->getBody()->getContents(), true);
         } catch (GuzzleException $e) {
-            Log::error('Error getting recently played', [
-                'message' => $e->getMessage(),
+            Log::error('Error fetching recently played', [
+                'error' => $e->getMessage(),
+                'code' => $e->getCode()
             ]);
-            throw $e;
+            return ['items' => []];
         }
     }
 }
