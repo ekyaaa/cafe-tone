@@ -259,7 +259,7 @@ cafe-tone/
 'user-read-currently-playing', // Get current track
 'playlist-read-private',       // Read private playlists
 'user-top-read',               // Get top tracks
-'user-read-recently-played',   // Get history
+'user-read-recently-played'    // Get history
 ```
 
 ### Key Endpoints Used
@@ -313,6 +313,63 @@ return [
     'night' => ['ambient', 'classical'],
 ];
 ```
+
+---
+
+## ⚠️ Important Legal Notice
+
+### Spotify API Commercial Use Restrictions
+
+**This project uses Spotify Web API which is NOT licensed for commercial use.**
+
+According to [Spotify Developer Terms of Service](https://developer.spotify.com/terms):
+
+> ❌ **Prohibited Uses:**
+> - Commercial use in public spaces (cafes, restaurants, retail stores, etc.)
+> - Broadcasting music to multiple users simultaneously
+> - Using Spotify as background music for business operations
+
+### ✅ Commercial Alternative: Spotify Soundtrack
+
+If you want to use this system **commercially** in your cafe or restaurant, you should use:
+
+**[Spotify Soundtrack for Business](https://soundtrack.spotify.com/)**
+
+- ✅ Licensed for commercial use
+- ✅ Curated playlists for business
+- ✅ Legal background music streaming
+- ✅ No ads interruption
+- ✅ Multiple device support
+
+### 🔄 Commercial Version Available
+
+**I can rework this project to use Soundtrack API for commercial deployment.**
+
+If you're interested in using Cafe Tone for your business:
+1. Sign up for [Spotify Soundtrack](https://soundtrack.spotify.com/)
+2. Contact me for commercial version adaptation
+3. Get proper licensing for your business
+
+**Contact for Commercial Version:**
+- Email: your.email@example.com
+- GitHub Issues: [Create an issue](https://github.com/yourusername/cafe-tone/issues)
+
+---
+
+## 📋 Disclaimer
+
+This project is intended for:
+- ✅ **Educational purposes**
+- ✅ **Personal development learning**
+- ✅ **Portfolio demonstration**
+- ✅ **Non-commercial experimentation**
+
+**NOT for:**
+- ❌ Commercial deployment without proper licensing
+- ❌ Public business use with standard Spotify API
+- ❌ Revenue-generating applications
+
+By using this code, you agree to comply with Spotify's Terms of Service and applicable copyright laws.
 
 ---
 
